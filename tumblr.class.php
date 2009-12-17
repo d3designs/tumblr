@@ -89,10 +89,17 @@ class Tumblr
 	var $subclass;
 
 	/**
+	 * Property: default_output
+	 * 	The output format (e.g. XML, JSON, PHP)
+	 */
+	var $default_output;
+
+	/**
 	 * Property: output
 	 * 	The output format (e.g. XML, JSON, PHP)
 	 */
 	var $output;
+
 
 	/**
 	 * Property: test_mode
@@ -110,13 +117,7 @@ class Tumblr
 	 * Property: set_hostname
 	 * 	Stores the hostname to use. This is inherited by all service-specific classes.
 	 */
-	var $hostname = null;
-
-	/**
-	 * Property: auth_hostname
-	 * 	Stores the auth hostname to use. This is inherited by all service-specific classes.
-	 */
-	var $auth_hostname = null;
+	var $hostname;
 
 
 	/*%******************************************************************************************%*/
@@ -137,35 +138,29 @@ class Tumblr
 	 * Returns:
 	 * 	boolean FALSE if no valid values are set, otherwise true.
 	 */
-	public function __construct($email = null, $password = null, $hostname = null, $subclass = null)
+	public function __construct($hostname = null, $email = null, $password = null, $subclass = null)
 	{
 		// Set default values
-		$this->email = null;
-		$this->password = null;
-		$this->hostname = null;
+		$this->hostname = $hostname;
+		$this->email    = $email;
+		$this->password = $password;
 		$this->subclass = (array) $subclass;
-		$this->auth_mode = null;
-		$this->auth_hostname = 'www.tumblr.com';
-		$this->auth_hostname = & $this->hostname;
+		$this->output         = null;
 		$this->output = 'xml';
-		
-		// If both a email and secret email are passed in, use those.
-		if ($email && $password && $hostname)
-		{
-			$this->email = $email;
-			$this->password = $password;
-			$this->password = $hostname;
-			return true;
-		}
-		// If neither are passed in, look for the constants instead.
-		else if (defined('TUMBLR_EMAIL') && defined('TUMBLR_PASSWORD') && defined('TUMBLR_HOSTNAME'))
-		{
-			$this->email = TUMBLR_EMAIL;
-			$this->password = TUMBLR_PASSWORD;
-			$this->hostname = TUMBLR_HOSTNAME;
-			return true;
-		}
 
+		
+
+		if ($email && $password && $hostname)
+			return true;
+
+		// If neither are passed in, look for the constants instead.
+		if (defined('TUMBLR_EMAIL') && defined('TUMBLR_PASSWORD') && defined('TUMBLR_HOSTNAME'))
+		{
+			$this->email    = (empty($this->email))? TUMBLR_EMAIL : $this->email;
+			$this->password = (empty($this->password))? TUMBLR_PASSWORD : $this->password;
+			$this->hostname = (empty($this->hostname))? TUMBLR_HOSTNAME : $this->hostname;
+			return true;
+		}
 		// Otherwise set the values to blank and return false.
 		else
 		{
@@ -178,21 +173,6 @@ class Tumblr
 
 	/*%******************************************************************************************%*/
 	// SETTERS
-
-	/**
-	 * Method: set_hostname()
-	 * 	Assigns a new hostname to use for an API-compatible web service.
-	 *
-	 * Parameters:
-	 * 	hostname - _string_ (Required) The hostname to make requests to.
-	 *
-	 * Returns:
-	 * 	void
-	 */
-	public function set_hostname($hostname)
-	{
-		$this->hostname = $hostname;
-	}
 
 	/**
 	 * Method: test_mode()
@@ -213,8 +193,9 @@ class Tumblr
 		$this->test_mode = $enabled;
 	}
 
+
 	/**
-	 * Method: test_mode()
+	 * Method: default_output()
 	 * 	Enables test mode within the API. Enabling test mode will return the request URL instead of requesting it.
 	 *
 	 * Access:
@@ -226,19 +207,11 @@ class Tumblr
 	 * Returns:
 	 * 	void
 	 */
-	public function auth_mode($enabled = true)
+	public function default_output($output)
 	{
 		// Set default values
-		$this->auth_mode = $enabled;
+		$this->default_output = $output;
 	}
-	
-	public function _login()
-	{
-		// Set default values
-		$this->auth_mode = true;
-		return $this;
-	}
-
 
 	/*%******************************************************************************************%*/
 	// MAGIC METHODS
@@ -255,9 +228,9 @@ class Tumblr
 		$subclass[] = strtolower($var);
 
 		// Re-instantiate this class, passing in the subclass value
-		$ref = new $class_name($this->email, $this->password, $this->hostname, $subclass);
+		$ref = new $class_name($this->hostname, $this->email, $this->password, $subclass);
 		$ref->test_mode($this->test_mode); // Make sure this gets passed through.
-		$ref->auth_mode($this->auth_mode); // Make sure this gets passed through.
+		$ref->default_output($this->default_output); // Make sure this gets passed through.
 
 		return $ref;
 	}
@@ -270,39 +243,51 @@ class Tumblr
 	
 		// Change the names of the methods to match what the API expects
 		$name = strtolower($name);
+		
+		$args = (array) $args[0];
 
 		$path = (count($this->subclass) > 0)? implode('/',$this->subclass) . '/' : '';
 		
+		$hostname = (isset($args['_hostname']))? $args['_hostname'] : $this->hostname;
+		
+		$this->output = (isset($args['_output']))? $args['_output'] : $this->default_output;
+		
 		$output = ($this->output == 'xml')? '' : '/' . $this->output;
 		
-		$method = $name;
+		$login = (isset($args['_login']))? $args['_login'] : false;
 		
-		$hostname = $this->hostname;
+		$method = ($login)? 'POST' : 'GET';
 		
-		if($this->auth_mode)
+		$query = '';
+		
+		if($login)
 		{
-			// Include default arguments
-			$default_args = array('email' => $this->email, 'password' => $this->password);
-			
-			$args[0] = @array_merge($default_args, (array)$args[0]);
-			
-			$hostname = $this->auth_hostname;
+			// Include login credentials
+			$login_credentials = array('email' => $this->email, 'password' => $this->password);
+			$args = array_merge($login_credentials, $args);
 		}
 		
+		// Remove private class arguments
+		unset($args['_login'], $args['_hostname'], $args['_output']);
+		
 		// Construct the rest of the query parameters with what was passed to the method
-		$args = ((count($args) > 0))? http_build_query($args[0], '', '&') : '';
+		$args = http_build_query($args, '', '&');
 		
-		// Construct the URL to request
-		$url = "http://{$hostname}/api/" . $path  . $method . $output;
+		if ($this->output == 'json')
+			$query = '?debug=1';
 		
-		if(!$this->auth_mode)
+		if(!empty($args) && $method == 'GET')
 		{
-			$url = (!empty($args))? $url . '?' . $args : $url;
+			$query = (empty($query))? '?' . $args : $query . '&' . $args;
 			$args = '';
 		}
 		
+		// Construct the URL to request
+		$url = "http://{$hostname}/api/" . $path  . $name . $output . $query;
+
+		
 		// Return the value
-		return $this->request($url,$args);
+		return $this->request($url,$args,$method);
 	}
 
 
@@ -319,51 +304,40 @@ class Tumblr
 	 * Returns:
 	 * 	ResponseCore object
 	 */
-	public function request($url,$args=null)
+	public function request($url, $body = null, $method = null)
 	{
-		if (!$this->test_mode)
-		{
-			if (class_exists('RequestCore'))
-			{
-				$http = new RequestCore($url);
-				$http->set_useragent(TUMBLR_USERAGENT);
-				
-				if($this->auth_mode)
-				{
-					$http->set_method(HTTP_POST);
-					$http->set_body($args);
-				}
-				
-				$http->send_request();
-				var_dump($http);
-				$response = new stdClass();
-				$response->header = $http->get_response_header();
-				$response->status = $http->get_response_code();
+		if ($this->test_mode)
+			return $url;
 
-				if ($response->status == 200)
-				{
-					$response->body = $this->parse_response($http->get_response_body());
-				}
-				else if ($response->status == 404)
-				{
-					$response->body = 'Not Found';
-				}
-				else 
-				{
-					$response->body = $http->get_response_body();
-				}
-				
-				$this->auth_mode = false;
-				
-				return $response;
-			}
-
+		if (!class_exists('RequestCore'))
 			throw new Exception('This class requires RequestCore. http://github.com/skyzyx/requestcore.');
-		}
-		
-		$this->auth_mode = false;
 
-		return $url;
+		$http = new RequestCore($url);
+		
+		$http->set_useragent(TUMBLR_USERAGENT);
+		
+		if (!empty($method))
+		 	$http->set_method($method);
+
+		if (!empty($body))
+			$http->set_body($body);
+		
+		$http->send_request();
+		
+		$response = new stdClass();
+		$response->header = $http->get_response_header();
+		$response->status = $http->get_response_code();
+
+		if ($response->status == 200)
+			$response->body = $this->parse_response($http->get_response_body());
+			
+		else if ($response->status == 404)
+			$response->body = 'Not Found';
+			
+		else 
+			$response->body = $http->get_response_body();
+		
+		return $response;
 	}
 
 	/**
@@ -378,7 +352,15 @@ class Tumblr
 	 */
 	public function parse_response($data)
 	{
-		return new SimpleXMLElement($data, LIBXML_NOCDATA);
-		// return $data;
+		switch ($this->output) {
+			case 'json':
+				return json_decode($data);
+				break;
+			
+			case 'xml':
+			default:
+				return new SimpleXMLElement($data, LIBXML_NOCDATA);
+				break;
+		}
 	}
 }
