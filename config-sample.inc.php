@@ -7,7 +7,7 @@
  * 	2009.10.25
  *
  * Copyright:
- * 	2009 Ryan Parman
+ * 	2009 Jay Williams
  *
  * License:
  * 	Simplified BSD License - http://opensource.org/licenses/bsd-license.php

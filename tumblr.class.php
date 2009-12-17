@@ -108,12 +108,6 @@ class Tumblr
 	var $test_mode;
 
 	/**
-	 * Property: auth_mode
-	 * 	Whether we should include the email/password and send the request as a POST.
-	 */
-	var $auth_mode;
-
-	/**
 	 * Property: set_hostname
 	 * 	Stores the hostname to use. This is inherited by all service-specific classes.
 	 */
