@@ -1,7 +1,7 @@
 <?php
 /**
  * File: api-tumblr
- * 	Handle the Tumblr Simple API.
+ * 	Handle the Tumblr API.
  *
  * Version:
  * 	2009.12.14
@@ -13,6 +13,15 @@
  * 	Simplified BSD License - http://opensource.org/licenses/bsd-license.php
  */
 
+
+/*%******************************************************************************************%*/
+// CORE DEPENDENCIES
+
+// Include the config file
+if (file_exists(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'config.inc.php'))
+{
+	include_once dirname(__FILE__) . DIRECTORY_SEPARATOR . 'config.inc.php';
+}
 
 /*%******************************************************************************************%*/
 // EXCEPTIONS
@@ -63,6 +72,17 @@ define('TUMBLR_USERAGENT', TUMBLR_NAME . '/' . TUMBLR_VERSION . ' (Tumblr Toolki
 class Tumblr
 {
 	/**
+	 * Property: email
+	 * 	The Tumblr email. This is inherited by all service-specific classes.
+	 */
+	private $email;
+
+	/**
+	 * Property: secret_key
+	 * 	The Tumblr password. This is inherited by all service-specific classes.
+	 */
+	private $password;
+	/**
 	 * Property: subclass
 	 * 	The API subclass (e.g. album, artist, user) to point the request to.
 	 */
@@ -81,16 +101,22 @@ class Tumblr
 	var $test_mode;
 
 	/**
-	 * Property: api_version
-	 * The supported API version. This is inherited by all service-specific classes.
+	 * Property: auth_mode
+	 * 	Whether we should include the email/password and send the request as a POST.
 	 */
-	var $api_version = null;
+	var $auth_mode;
 
 	/**
 	 * Property: set_hostname
-	 * 	Stores the alternate hostname to use, if any. This is inherited by all service-specific classes.
+	 * 	Stores the hostname to use. This is inherited by all service-specific classes.
 	 */
-	// var $hostname = null;
+	var $hostname = null;
+
+	/**
+	 * Property: auth_hostname
+	 * 	Stores the auth hostname to use. This is inherited by all service-specific classes.
+	 */
+	var $auth_hostname = null;
 
 
 	/*%******************************************************************************************%*/
@@ -111,13 +137,41 @@ class Tumblr
 	 * Returns:
 	 * 	boolean FALSE if no valid values are set, otherwise true.
 	 */
-	public function __construct($subclass = null)
+	public function __construct($email = null, $password = null, $hostname = null, $subclass = null)
 	{
 		// Set default values
+		$this->email = null;
+		$this->password = null;
+		$this->hostname = null;
 		$this->subclass = (array) $subclass;
+		$this->auth_mode = null;
+		$this->auth_hostname = 'www.tumblr.com';
+		$this->auth_hostname = & $this->hostname;
 		$this->output = 'xml';
-		$this->api_version = 'v2';
+		
+		// If both a email and secret email are passed in, use those.
+		if ($email && $password && $hostname)
+		{
+			$this->email = $email;
+			$this->password = $password;
+			$this->password = $hostname;
+			return true;
+		}
+		// If neither are passed in, look for the constants instead.
+		else if (defined('TUMBLR_EMAIL') && defined('TUMBLR_PASSWORD') && defined('TUMBLR_HOSTNAME'))
+		{
+			$this->email = TUMBLR_EMAIL;
+			$this->password = TUMBLR_PASSWORD;
+			$this->hostname = TUMBLR_HOSTNAME;
+			return true;
+		}
 
+		// Otherwise set the values to blank and return false.
+		else
+		{
+			throw new Tumblr_Exception('No valid credentials were used to authenticate with Tumblr.');
+		}
+		
 		return true;
 	}
 
@@ -126,18 +180,18 @@ class Tumblr
 	// SETTERS
 
 	/**
-	 * Method: set_api_version()
-	 * 	Sets a new API version to use in the request.
+	 * Method: set_hostname()
+	 * 	Assigns a new hostname to use for an API-compatible web service.
 	 *
 	 * Parameters:
-	 * 	api_version - _string_ (Required) The version to use (e.g. 2.0).
+	 * 	hostname - _string_ (Required) The hostname to make requests to.
 	 *
 	 * Returns:
 	 * 	void
 	 */
-	public function set_api_version($api_version)
+	public function set_hostname($hostname)
 	{
-		$this->api_version = $api_version;
+		$this->hostname = $hostname;
 	}
 
 	/**
@@ -159,6 +213,32 @@ class Tumblr
 		$this->test_mode = $enabled;
 	}
 
+	/**
+	 * Method: test_mode()
+	 * 	Enables test mode within the API. Enabling test mode will return the request URL instead of requesting it.
+	 *
+	 * Access:
+	 * 	public
+	 *
+	 * Parameters:
+	 * 	enabled - _boolean_ (Optional) Whether test mode is enabled or not.
+	 *
+	 * Returns:
+	 * 	void
+	 */
+	public function auth_mode($enabled = true)
+	{
+		// Set default values
+		$this->auth_mode = $enabled;
+	}
+	
+	public function _login()
+	{
+		// Set default values
+		$this->auth_mode = true;
+		return $this;
+	}
+
 
 	/*%******************************************************************************************%*/
 	// MAGIC METHODS
@@ -175,9 +255,9 @@ class Tumblr
 		$subclass[] = strtolower($var);
 
 		// Re-instantiate this class, passing in the subclass value
-		$ref = new $class_name($subclass);
+		$ref = new $class_name($this->email, $this->password, $this->hostname, $subclass);
 		$ref->test_mode($this->test_mode); // Make sure this gets passed through.
-		$ref->set_api_version($this->api_version); // Make sure this gets passed through.
+		$ref->auth_mode($this->auth_mode); // Make sure this gets passed through.
 
 		return $ref;
 	}
@@ -193,46 +273,36 @@ class Tumblr
 
 		$path = (count($this->subclass) > 0)? implode('/',$this->subclass) . '/' : '';
 		
-		$method = $name . '.' . $this->output;
-
-		// Construct the rest of the query parameters with what was passed to the method
-		$query = ((count($args) > 0))? '?' . http_build_query($args[0], '', '&') : '';
+		$output = ($this->output == 'xml')? '' : '/' . $this->output;
 		
-		$version = (!empty($this->api_version))? $this->api_version . '/' : '';
+		$method = $name;
+		
+		$hostname = $this->hostname;
+		
+		if($this->auth_mode)
+		{
+			// Include default arguments
+			$default_args = array('email' => $this->email, 'password' => $this->password);
+			
+			$args[0] = @array_merge($default_args, (array)$args[0]);
+			
+			$hostname = $this->auth_hostname;
+		}
+		
+		// Construct the rest of the query parameters with what was passed to the method
+		$args = ((count($args) > 0))? http_build_query($args[0], '', '&') : '';
 		
 		// Construct the URL to request
-		$api_call = 'http://tumblr.com/api/' . $version . $path  . $method  . $query;
-
+		$url = "http://{$hostname}/api/" . $path  . $method . $output;
+		
+		if(!$this->auth_mode)
+		{
+			$url = (!empty($args))? $url . '?' . $args : $url;
+			$args = '';
+		}
+		
 		// Return the value
-		return $this->request($api_call);
-	}
-
-	/**
-	 * Method: oembed()
-	 * 	Requests the oEmbed code for the specified video URL. 
-	 * 	Due to the Tumblr API, you must remove the API version number before you submit a oEmbed request.
-	 * 	This method temporarily removes the API version number, and resets it after the request has finished.
-	 * 	Yes, this is an unfortunate hack.
-	 *
-	 * Parameters:
-	 * 	args - _array_ (Required) Must contain the array key 'url' for oembed lookup
-	 *
-	 * Returns:
-	 * 	ResponseCore object
-	 */
-	public function oembed($args = null)
-	{
-		// Save Current API Version
-		$version = $this->api_version;
-
-		// Temporarily remove API Version for the oembed() request
-		$this->set_api_version(null);
-		$result = $this->__call('oembed', array($args));
-	
-		// Reset the API Version
-		$this->set_api_version($version);
-
-		return $result;
+		return $this->request($url,$args);
 	}
 
 
@@ -249,7 +319,7 @@ class Tumblr
 	 * Returns:
 	 * 	ResponseCore object
 	 */
-	public function request($url)
+	public function request($url,$args=null)
 	{
 		if (!$this->test_mode)
 		{
@@ -257,18 +327,41 @@ class Tumblr
 			{
 				$http = new RequestCore($url);
 				$http->set_useragent(TUMBLR_USERAGENT);
+				
+				if($this->auth_mode)
+				{
+					$http->set_method(HTTP_POST);
+					$http->set_body($args);
+				}
+				
 				$http->send_request();
-
+				var_dump($http);
 				$response = new stdClass();
 				$response->header = $http->get_response_header();
-				$response->body = $this->parse_response($http->get_response_body());
 				$response->status = $http->get_response_code();
 
+				if ($response->status == 200)
+				{
+					$response->body = $this->parse_response($http->get_response_body());
+				}
+				else if ($response->status == 404)
+				{
+					$response->body = 'Not Found';
+				}
+				else 
+				{
+					$response->body = $http->get_response_body();
+				}
+				
+				$this->auth_mode = false;
+				
 				return $response;
 			}
 
 			throw new Exception('This class requires RequestCore. http://github.com/skyzyx/requestcore.');
 		}
+		
+		$this->auth_mode = false;
 
 		return $url;
 	}
@@ -286,5 +379,6 @@ class Tumblr
 	public function parse_response($data)
 	{
 		return new SimpleXMLElement($data, LIBXML_NOCDATA);
+		// return $data;
 	}
 }

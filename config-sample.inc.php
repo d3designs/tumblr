@@ -15,13 +15,20 @@
 
 
 /**
- * Constant: TUMBLR_KEY
- * 	Tumblr API Key. <http://tumblr.com/api/applications/new>
+ * Constant: TUMBLR_EMAIL
+ * 	Tumblr Email (optional, used for auth_mode() requests)
  */
-define('TUMBLR_KEY', '');
+define('TUMBLR_EMAIL', '');
 
 /**
- * Constant: TUMBLR_SECRET_KEY
- * 	Tumblr API Secret Key. <http://tumblr.com/api/applications/new>
+ * Constant: TUMBLR_PASSWORD
+ * 	Tumblr Password (optional, used for auth_mode() requests)
  */
-define('TUMBLR_SECRET_KEY', '');
+define('TUMBLR_PASSWORD', '');
+
+/**
+ * Constant: TUMBLR_HOSTNAME
+ * 	Tumblr Hostname (Required)
+ */
+define('TUMBLR_HOSTNAME', 'user.tumblr.com');
+
