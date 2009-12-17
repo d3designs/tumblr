@@ -1,0 +1,3 @@
+[submodule "lib/requestcore"]
+	path = lib/requestcore
+	url = git://github.com/skyzyx/requestcore.git
