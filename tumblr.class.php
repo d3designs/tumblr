@@ -316,7 +316,7 @@ class Tumblr
 	public function request($url, $body = null, $method = null)
 	{
 		if ($this->test_mode)
-			return $url;
+			return array('url' => $url, 'body' => $body, 'method' => $method);
 
 		if (!class_exists('RequestCore'))
 			throw new Exception('This class requires RequestCore. http://github.com/skyzyx/requestcore.');

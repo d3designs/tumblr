@@ -1,10 +1,10 @@
 <?php
 /**
  * File: api-tumblrCache
- * 	Handle the JSON formatted Tumblr Simple API, and Cache the results to files.
+ * 	Handle the Tumblr API and Cache the results to files.
  *
  * Version:
- * 	2009.12.14
+ * 	2009.12.20
  *
  * Copyright:
  * 	2009 Jay Williams
@@ -52,14 +52,15 @@ class TumblrCache extends Tumblr
 	 * 	public
 	 *
 	 * Parameters:
-	 * 	key - _string_ (Optional) Your Tumblr API Key. If blank, it will look for the <AWS_KEY> constant.
-	 * 	secret_key - _string_ (Optional) Your Tumblr API Secret Key. If blank, it will look for the <AWS_SECRET_KEY> constant.
-	 * 	subclass - _string_ (Optional) Don't use this. This is an internal parameter.
+	 * 	hostname - _string_ (Optional) Your Tumblr Blog hostname. If blank, it will look for the <TUMBLR_HOSTNAME> constant.
+	 * 	email - _string_ (Optional) Your Tumblr login e-mail address. If blank, it will look for the <TUMBLR_EMAIL> constant.
+	 * 	password - _string_ (Optional) Your Tumblr login password. If blank, it will look for the <TUMBLR_PASSWORD> constant.
+	 * 	subclass - _array_ (Optional) Don't use this. This is an internal parameter.
 	 *
 	 * Returns:
 	 * 	boolean FALSE if no valid values are set, otherwise true.
 	 */
-	public function __construct($subclass = null)
+	public function __construct($hostname = null, $email = null, $password = null, $subclass = null)
 	{
 		// Set default values
 		$this->cache_mode  = false;
@@ -67,7 +68,7 @@ class TumblrCache extends Tumblr
 		$this->cache_path  = './cache/';
 		$this->header_mode = false;
 		
-		return parent::__construct($subclass);
+		return parent::__construct($hostname, $email, $password, $subclass);
 	}
 
 
@@ -136,13 +137,14 @@ class TumblrCache extends Tumblr
 	{
 		// Determine the name of this class
 		$class_name = get_class($this);
-
+		
 		$subclass = (array) $this->subclass;
 		$subclass[] = strtolower($var);
 
 		// Re-instantiate this class, passing in the subclass value
-		$ref = new $class_name($subclass);
+		$ref = new $class_name($this->hostname, $this->email, $this->password, $subclass);
 		$ref->test_mode($this->test_mode); // Make sure this gets passed through.
+		$ref->default_output($this->default_output); // Make sure this gets passed through.
 		$ref->cache_mode($this->cache_mode, $this->cache_ttl, $this->cache_path); // Make sure this gets passed through.
 		$ref->header_mode($this->header_mode); // Make sure this gets passed through.
 
@@ -152,12 +154,12 @@ class TumblrCache extends Tumblr
 	/**
 	 * Handle requests to methods
 	 */
-	public function __call($name, $args)
-	{
-		$this->output = 'json';
-		
-		return parent::__call($name, $args);
-	}
+	// public function __call($name, $args)
+	// {
+	// 	$this->output = 'json';
+	// 	
+	// 	return parent::__call($name, $args);
+	// }
 
 
 	/*%******************************************************************************************%*/
@@ -169,17 +171,19 @@ class TumblrCache extends Tumblr
 	 *
 	 * Parameters:
 	 * 	url - _string_ (Required) The web service URL to request.
+	 * 	body - _string_ (Optional) Any form values to include with a POST request.
+	 * 	method - _string_ (Optional) The method used to submit the request, defaults to GET.
 	 *
 	 * Returns:
 	 * 	ResponseCore object
 	 */
-	public function request($url)
+	public function request($url, $body = null, $method = null)
 	{
 		if ($this->test_mode)
-			return $url;
+			return array('url' => $url, 'body' => $body, 'method' => $method);
 		
 		// Generate cache filename
-		$cache = $this->cache_path . get_class() . '_' . md5($url) . '.cache';
+		$cache = $this->cache_path . get_class() . '_' . md5($url.$body) . '.cache';
 		
 		// If cache exists, and is still valid, load it
 		if($this->cache_mode && file_exists($cache) && (time() - filemtime($cache)) < $this->cache_ttl)
@@ -222,18 +226,4 @@ class TumblrCache extends Tumblr
 		return $response;
 	}
 
-	/**
-	 * Method: parse_response()
-	 * 	Method for parsing the JSON response data.
-	 *
-	 * Parameters:
-	 * 	data - _string_ (Required) The data to parse.
-	 *
-	 * Returns:
-	 * 	mixed data
-	 */
-	public function parse_response($data)
-	{
-		return json_decode($data);
-	}
 }
