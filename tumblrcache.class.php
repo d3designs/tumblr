@@ -151,16 +151,6 @@ class TumblrCache extends Tumblr
 		return $ref;
 	}
 
-	/**
-	 * Handle requests to methods
-	 */
-	// public function __call($name, $args)
-	// {
-	// 	$this->output = 'json';
-	// 	
-	// 	return parent::__call($name, $args);
-	// }
-
 
 	/*%******************************************************************************************%*/
 	// REQUEST/RESPONSE
