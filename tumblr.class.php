@@ -4,7 +4,7 @@
  * 	Handle the Tumblr API.
  *
  * Version:
- * 	2009.12.14
+ * 	2009.12.20
  *
  * Copyright:
  * 	2009 Jay Williams
@@ -72,34 +72,42 @@ define('TUMBLR_USERAGENT', TUMBLR_NAME . '/' . TUMBLR_VERSION . ' (Tumblr Toolki
 class Tumblr
 {
 	/**
+	 * Property: hostname
+	 * 	The Tumblr blog hostname. This is inherited by all service-specific classes.
+	 */
+	var $hostname;
+
+	/**
 	 * Property: email
-	 * 	The Tumblr email. This is inherited by all service-specific classes.
+	 * 	The Tumblr login email address. This is inherited by all service-specific classes.
+	 * 	Note: Only required for authenticated requests.
 	 */
 	private $email;
 
 	/**
 	 * Property: secret_key
 	 * 	The Tumblr password. This is inherited by all service-specific classes.
+	 * 	Note: Only required for authenticated requests.
 	 */
 	private $password;
+	
 	/**
 	 * Property: subclass
-	 * 	The API subclass (e.g. album, artist, user) to point the request to.
+	 * 	The API subclass to point the request to.
 	 */
 	var $subclass;
 
 	/**
 	 * Property: default_output
-	 * 	The output format (e.g. XML, JSON, PHP)
+	 * 	The default output format (e.g. XML, JSON)
 	 */
 	var $default_output;
 
 	/**
 	 * Property: output
-	 * 	The output format (e.g. XML, JSON, PHP)
+	 * 	The current output format (e.g. XML, JSON)
 	 */
 	var $output;
-
 
 	/**
 	 * Property: test_mode
@@ -108,7 +116,13 @@ class Tumblr
 	var $test_mode;
 
 	/**
-	 * Property: set_hostname
+	 * Property: auth_mode
+	 * 	Whether we should include the email/password and send the request as a POST.
+	 */
+	var $auth_mode;
+
+	/**
+	 * Property: hostname
 	 * 	Stores the hostname to use. This is inherited by all service-specific classes.
 	 */
 	var $hostname;
@@ -125,9 +139,10 @@ class Tumblr
 	 * 	public
 	 *
 	 * Parameters:
-	 * 	key - _string_ (Optional) Your Tumblr API Key. If blank, it will look for the <AWS_KEY> constant.
-	 * 	secret_key - _string_ (Optional) Your Tumblr API Secret Key. If blank, it will look for the <AWS_SECRET_KEY> constant.
-	 * 	subclass - _string_ (Optional) Don't use this. This is an internal parameter.
+	 * 	hostname - _string_ (Optional) Your Tumblr Blog hostname. If blank, it will look for the <TUMBLR_HOSTNAME> constant.
+	 * 	email - _string_ (Optional) Your Tumblr login e-mail address. If blank, it will look for the <TUMBLR_EMAIL> constant.
+	 * 	password - _string_ (Optional) Your Tumblr login password. If blank, it will look for the <TUMBLR_PASSWORD> constant.
+	 * 	subclass - _array_ (Optional) Don't use this. This is an internal parameter.
 	 *
 	 * Returns:
 	 * 	boolean FALSE if no valid values are set, otherwise true.
@@ -140,9 +155,7 @@ class Tumblr
 		$this->password = $password;
 		$this->subclass = (array) $subclass;
 		$this->output         = null;
-		$this->output = 'xml';
-
-		
+		$this->default_output = 'xml';
 
 		if ($email && $password && $hostname)
 			return true;
@@ -190,13 +203,13 @@ class Tumblr
 
 	/**
 	 * Method: default_output()
-	 * 	Enables test mode within the API. Enabling test mode will return the request URL instead of requesting it.
+	 * 	Sets the default output format for the API.
 	 *
 	 * Access:
 	 * 	public
 	 *
 	 * Parameters:
-	 * 	enabled - _boolean_ (Optional) Whether test mode is enabled or not.
+	 * 	output - _string_ (Required) the default output mode. (e.g. xml, json)
 	 *
 	 * Returns:
 	 * 	void
@@ -204,7 +217,7 @@ class Tumblr
 	public function default_output($output)
 	{
 		// Set default values
-		$this->default_output = $output;
+		$this->default_output = strtolower($output);
 	}
 
 	/*%******************************************************************************************%*/
@@ -294,6 +307,8 @@ class Tumblr
 	 *
 	 * Parameters:
 	 * 	url - _string_ (Required) The web service URL to request.
+	 * 	body - _string_ (Optional) Any form values to include with a POST request.
+	 * 	method - _string_ (Optional) The method used to submit the request, defaults to GET.
 	 *
 	 * Returns:
 	 * 	ResponseCore object
