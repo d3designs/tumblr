@@ -183,7 +183,7 @@ class TumblrCache extends Tumblr
 			return array('url' => $url, 'body' => $body, 'method' => $method);
 		
 		// Generate cache filename
-		$cache = $this->cache_path . get_class() . '_' . md5($url.$body) . '.cache';
+		$cache = $this->cache_path . get_class() . '_' . md5($url.$body.$method) . '.cache';
 		
 		// If cache exists, and is still valid, load it
 		if($this->cache_mode && file_exists($cache) && (time() - filemtime($cache)) < $this->cache_ttl)
@@ -191,10 +191,10 @@ class TumblrCache extends Tumblr
 			$response = json_decode(file_get_contents($cache));
 			
 			// Add notice that this is a cached file
-			// if (is_object($response))
-			// 	$response->_cached = true;
-			// elseif (is_array($response))
-			// 	$response['_cached'] = true;
+			if (is_object($response))
+				$response->_cached = true;
+			elseif (is_array($response))
+				$response['_cached'] = true;
 			
 			return $response;
 		}
@@ -203,10 +203,28 @@ class TumblrCache extends Tumblr
 			throw new Exception('This class requires RequestCore. http://requestcore.googlecode.com');
 		
 		$http = new RequestCore($url);
+		
 		$http->set_useragent(TUMBLR_USERAGENT);
+		
+		if (!empty($method))
+		 	$http->set_method($method);
+
+		if (!empty($body))
+			$http->set_body($body);
+		
 		$http->send_request();
 		
-		$response = $this->parse_response($http->get_response_body());
+		// $response->header = $http->get_response_header();
+		$status = $http->get_response_code();
+
+		if ($status == 200)
+			$response = $this->parse_response($http->get_response_body());
+			
+		else if ($status == 404)
+			$response = 'Not Found';
+			
+		else 
+			$response = $http->get_response_body();
 
 		if ($this->header_mode)
 		{
@@ -217,7 +235,7 @@ class TumblrCache extends Tumblr
 		}
 		
 		// Cache only successfuly requests, check if http code begins with 2 (eg. 200,201,etc.)
-		if ($this->cache_mode && substr($http->get_response_code(),0,1) == '2')
+		if ($this->cache_mode && $status == 200)
 		{
 			file_put_contents($cache . '_tmp', json_encode($response));
 			rename($cache . '_tmp', $cache);

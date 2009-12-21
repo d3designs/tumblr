@@ -121,12 +121,6 @@ class Tumblr
 	 */
 	var $auth_mode;
 
-	/**
-	 * Property: hostname
-	 * 	Stores the hostname to use. This is inherited by all service-specific classes.
-	 */
-	var $hostname;
-
 
 	/*%******************************************************************************************%*/
 	// CONSTRUCTOR
