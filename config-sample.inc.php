@@ -1,10 +1,10 @@
 <?php
 /**
  * File: Configuration
- * 	Stores your Tumblr API information. Add your account information, then rename this file to 'config.inc.php'.
+ * 	Stores your Tumblr information. Add your account information, then rename this file to 'config.inc.php'.
  *
  * Version:
- * 	2009.10.25
+ * 	2009.12.20
  *
  * Copyright:
  * 	2009 Jay Williams
@@ -13,22 +13,20 @@
  * 	Simplified BSD License - http://opensource.org/licenses/bsd-license.php
  */
 
+/**
+ * Constant: TUMBLR_HOSTNAME
+ * 	Tumblr Hostname (Required) The Tumblr Blog address or CNAME to send the requests to.
+ */
+define('TUMBLR_HOSTNAME', 'user.tumblr.com');
 
 /**
  * Constant: TUMBLR_EMAIL
- * 	Tumblr Email (optional, used for auth_mode() requests)
+ * 	Tumblr Email (Optional) Used for any authenticated requests.
  */
 define('TUMBLR_EMAIL', '');
 
 /**
  * Constant: TUMBLR_PASSWORD
- * 	Tumblr Password (optional, used for auth_mode() requests)
+ * 	Tumblr Password (Optional) Used for any authenticated requests.
  */
 define('TUMBLR_PASSWORD', '');
-
-/**
- * Constant: TUMBLR_HOSTNAME
- * 	Tumblr Hostname (Required)
- */
-define('TUMBLR_HOSTNAME', 'user.tumblr.com');
-
