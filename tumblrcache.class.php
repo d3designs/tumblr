@@ -226,7 +226,8 @@ class TumblrCache extends Tumblr
 		else 
 			$response = $http->get_response_body();
 
-		if ($this->header_mode)
+		// SimpleXMLElement currently doesn't allow assigning complext types to properties
+		if ($this->header_mode && get_class($response) != 'SimpleXMLElement')
 		{
 			if (is_object($response))
 				$response->_header = $http->get_response_header();
